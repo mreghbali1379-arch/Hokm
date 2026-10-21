@@ -1,26 +1,32 @@
 name: Build APK
+
 on:
   push:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Unzip project
-        run: unzip -q hokm-android.zip
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
+
       - name: Build debug APK
-        working-directory: hokm-android
         run: gradle assembleDebug --stacktrace
+
+      - name: Unit tests (do not block the APK)
+        continue-on-error: true
+        run: gradle testDebugUnitTest --stacktrace
+
       - uses: actions/upload-artifact@v6
         with:
           name: hokm-debug-apk
-          path: hokm-android/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
