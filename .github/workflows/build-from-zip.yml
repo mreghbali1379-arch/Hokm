@@ -1,0 +1,60 @@
+name: Build APK from zip
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unzip the project
+        shell: bash
+        run: |
+          mkdir work
+          unzip -q "$(ls *.zip | head -1)" -d work
+          cd work
+          if [ ! -f settings.gradle ] && [ "$(ls | wc -l)" = "1" ]; then cd "$(ls)"; fi
+          test -f settings.gradle
+          echo "PROJ=$(pwd)" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJ }}
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Upload the APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hokm-debug-apk
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload the build log (copy the errors from it)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ env.PROJ }}/build.log
+          if-no-files-found: ignore
